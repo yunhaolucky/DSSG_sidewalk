@@ -1,0 +1,13 @@
+#### How to use OSRM (OS X)
+#### Step 1: Build OSRM
+Install in terminal:
+```
+brew install boost git cmake protobuf libzip libstxxl libxml2 osm-pbf lua51 luajit luabind tbb
+git clone https://github.com/Project-OSRM/osrm-backend.git
+cd osrm-backend
+mkdir -p build
+cd build
+cmake ..
+make
+```
+#### Step 2: Running OSRM

@@ -44,3 +44,5 @@ SELECT row_to_json(fc)
 ```
 scp -i pgrouting.pem  ubuntu@52.11.192.158:~\file_to_sent.zip .
 ```
+
+#### Create Node information from Sidewalks

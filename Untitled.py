@@ -65,10 +65,27 @@ class sidewalkList:
         self.crosswalks = QgsVectorLayer(self._setUri("mrkdcrosswalks",query_statement).uri(), "markedCrosswalks","postgres")
         QgsMapLayerRegistry.instance().addMapLayer(self.crosswalks)
 
+    def importIntersect(self):
+        bbox = self.getbounds()
+        #if self._existLayer('markedCrosswalks'):
+        #    return
+        query_statement = "ST_Transform(sdot_intersection.geom,4326) && ST_MakeEnvelope(%.14f,%.14f,%.14f,%.14f,4326)" % (bbox[3],bbox[0],bbox[1],bbox[2])
+        self.intersection = QgsVectorLayer(self._setUri("sdot_intersection",query_statement).uri(), "sdot_intersection","postgres")
+        QgsMapLayerRegistry.instance().addMapLayer(self.intersection)
 
 
+    def _setDB(self):
+        db = QSqlDatabase.addDatabase("QPSQL"); # Don't know what does this mean
+        db.setHostName("52.11.192.158")
+        db.setDatabaseName("test")
+        db.setPort(5432)
+        db.setUserName("postgres")
+        return db
 
 
+    def assign_intersections(self):
+        db = self._setDB()
+        
 
 
 
@@ -130,12 +147,18 @@ class osmStreetList:
         street_inter_Layer = QgsVectorLayer("Point?crs=EPSG:4326", "street_intersection", "memory")
         street_inter_Layer.startEditing()  
         layerData = street_inter_Layer.dataProvider()
+        layerData.addAttributes( [ QgsField("id", QVariant.Int)])
+        n = 0
         for node in result.nodes:
             fet = QgsFeature()
+            n = n + 1
             fet.setGeometry(QgsGeometry.fromPoint(QgsPoint(node.lon, node.lat)))
+            fet.setAttributes([n])
             layerData.addFeatures([fet])
         street_inter_Layer.commitChanges()
         QgsMapLayerRegistry.instance().addMapLayer(street_inter_Layer)
+
+
 
 
 def main():
@@ -143,6 +166,7 @@ def main():
     ostrList = osmStreetList(swList.getbounds())
     swList.importCurbRamps()
     swList.importCrossWalk()
+    swList.importIntersect()
 
 
 main()

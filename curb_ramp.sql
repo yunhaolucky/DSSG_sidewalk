@@ -13,6 +13,10 @@ SELECT * FROM processed_sidewalks limit 5;
 CREATE INDEX spatial_sidewalks ON processed_sidewalks USING gist(geom);
 ALTER TABLE processed_sidewalks ADD PRIMARY KEY (id);
 
+UPDATE processed_sidewalks 
+SET s_geom = null
+WHERE GeometryType(geom) != 'LINESTRING';
+
 ------ Comments on ST_LineMerge: There are 14 sidewalks have include more than 1 geometries. All of them can be merged using ST_LineMerge.
 
 -- Step2: Assign curb ramps to nodes

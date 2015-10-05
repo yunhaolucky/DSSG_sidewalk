@@ -323,7 +323,6 @@ $$
 LANGUAGE plpgsql;
 
 
-
 CREATE OR REPLACE FUNCTION extend_line(s geometry, i geometry, type text) RETURNS geometry AS
 $$
 DECLARE az double precision;
@@ -351,12 +350,7 @@ $$
 LANGUAGE plpgsql;
 
 
-
-
-
-
 /*
-
 DROP TABLE yun_test_intersection;
 CREATE TABLE yun_test_intersection AS
 SELECT row_number() over() as id find_intersection_point(q.s_geom[1], q.s_geom[2], q.i_geom)
@@ -395,7 +389,6 @@ UPDATE yun_cleaned_sidewalks
 SET s_changed = False, e_changed = False;
 
 
-
 UPDATE yun_ready_range_clean_intersects
 SET isCleaned = false;
 
@@ -416,9 +409,12 @@ SET isCleaned = extend_pairs(s_id[1], s_id[2],s_type[1], s_type[2], i_geom)
 WHERE isCleaned = false AND size = 2;
 
 UPDATE yun_ready_range_clean_intersects
+SET isCleaned = false
+WHERE size = 1;
+
+UPDATE yun_ready_range_clean_intersects
 SET isCleaned = merge_to_middle_point(s_id, s_type,st_centroid(st_collect(e_geom)), s_geom, size)
 WHERE isCleaned = false AND size = 2;
-
 
 CREATE OR REPLACE VIEW yun_test_cleaned_result AS
 SELECT rownumber() over() as id st_collect(e_geom), isCleaned FROM yun_ready_range_clean_intersects;

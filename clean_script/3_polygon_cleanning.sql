@@ -1,3 +1,4 @@
+/*
 -- Step0: Create index on compkey
 CREATE UNIQUE INDEX street_compkey ON street (compkey);
 --- However, postgresql does not allow me to this because compkey is not unique. Find compkey that is not unique
@@ -52,10 +53,8 @@ GROUP by query.artclass;
 */
 
 -- See all streets without sidewalk 
-SELECT s.id, s.geom
-FROM street s
-LEFT JOIN raw_sidewalks r ON s.compkey = r.segkey
-WHERE (r.id is not null OR s.artclass < 3) 
+
+
 -- We see it is very accurate that street picked by this sql code does not have sidewalks on the map.
 -- Therefore, compkey is useful in two ways.
 -- 1. Help us to detect those missing sidewalks. 
@@ -65,13 +64,12 @@ WHERE (r.id is not null OR s.artclass < 3)
 CREATE TABLE boundary_polygons AS
 SELECT g.path[1] as gid,geom
 FROM(
-	SELECT (ST_Dump(ST_Polygonize(picked_sidewalks.geom))).*
-	FROM (
-		SELECT DISTINCT ON (s.id) s.id, s.geom
-		FROM street s
-		LEFT JOIN raw_sidewalks r ON s.compkey = r.segkey
-		WHERE r.id is not null OR s.artclass < 3) as picked_sidewalks
+	SELECT (ST_Dump(ST_Polygonize(yun_processed_street.geom))).*
+  FROM (yun_processed_street
 	) as g;
+
+CREATE INDEX index_yun_boundary_polygons ON boundary_polygons USING gist(geom);
+
 
 -- Step3: Remove overlap polygons
 DELETE FROM boundary_polygons
@@ -87,21 +85,23 @@ GROUP BY b1.gid HAVING count(b1.gid) > 1);
 ---Method1: 6387
 
 --- Step1: Find all sidewalks what are within a polygons
-CREATE TABLE grouped_sidewalks AS
-SELECT b.gid as b_id, s.id as s_id, s.geom as s_geom
-FROM processed_sidewalks as s
+CREATE TABLE yun_grouped_sidewalks AS
+SELECT b.gid as b_id, s.id as s_id, s.geom as s_geom, s_changed, e_changed
+FROM 
+(SELECT * FROM yun_cleaned_sidewalks WHERE geometrytype(q.geom) = 'LINESTRING') as s
 LEFT JOIN boundary_polygons  as b ON ST_Within(s.geom,b.geom);
 -- 39609 sidewalks are classified in this step.
 
 ---  Step2: Find all polygons that is not assigned to any polygons because of offshoots.
-UPDATE grouped_sidewalks
+UPDATE yun_grouped_sidewalks
 SET b_id = query.b_id 
 FROM(
-SELECT b.gid as b_id, s.s_id, s.s_geom as s_geom FROM 
-(SELECT * FROM grouped_sidewalks
+SELECT b.gid as b_id, s.s_id, s.s_geom as s_geom,s_changed, e_changedFROM 
+(SELECT * FROM yun_grouped_sidewalks
 WHERE b_id is null) as s
 INNER JOIN boundary_polygons as b ON ST_Within(ST_Line_Interpolate_Point(s.s_geom, 0.5),b.geom) = True) AS query
-WHERE grouped_sidewalks.s_id = query.s_id;
+WHERE yun_grouped_sidewalks.s_id = query.s_id;
+
 -- 3222 sidewalks are classified in this step. 1 sidewalks are assiged to 2 groups. 
 -- (polygons - 24403 4638, 4698)
 -- SELECT ST_Within(ST_Line_Interpolate_Point(c.geom, 0.5),a.geom)  from (select * from boundary_polygons where gid = 4638) as a, (select * from boundary_polygons where gid = 4698) as b, (select * from processed_sidewalks where id = 24403) as c
@@ -176,5 +176,20 @@ INNER JOIN union_polygons  as u
 ORDER BY s.s_id, ST_Distance(s.s_geom, u.geom)  ) AS query
 WHERE grouped_sidewalks.s_id = query.s_id
 
+
+
+
+-- Fetch id
+SELECT b_id, array_agg(s_id) from yun_grouped_sidewalks
+group by b_id;
+-- Fetch geom
+SELECT b_id,  st_asgeojson(ST_Collect(s_geom)) from yun_grouped_sidewalks
+group by b_id;
+-- Fetch whether start point changed
+SELECT b_id,  array_agg(s_changed) from yun_grouped_sidewalks
+group by b_id;
+-- Fetch whether end point changed
+SELECT b_id,  array_agg(e_changed) from yun_grouped_sidewalks
+group by b_id;
 
 

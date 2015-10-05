@@ -118,15 +118,23 @@ SELECT * FROM (
 		rig.i_id,
 		rig.range_group, 
 		st_centroid(st_collect(rig.c_geom)) as c_geom,
-		st_collect(rig.s_geom) as s_geom
+		st_collect(rig.s_geom) as s_geom,
+		num(c_id) as count
 	FROM 
 		yun_intersection_group as rig
 	GROUP BY i_id,  i_geom, range_group) as q;
 
 DROP TABLE yun_connection;
-CREATE TABLE yun_connection AS
+CREATE TABLE yun_connection(
+id SERIAL primary key, 
+geom geometry, 
+c1_id int, 
+c2_id int
+);
+
+INSERT INTO yun_connection (geom, c1_id, c2_id)
 SELECT 
-	ST_MakeLine(q1.c_geom, q2.c_geom),
+	ST_MakeLine(q1.c_geom, q2.c_geom) as geom,
 	q1.id as c1_id,
 	q2.id as c2_id
 FROM 
@@ -149,9 +157,9 @@ FROM
 ) as number
 WHERE number.i_id = q1.i_id AND q1.i_id = q2.i_id AND (q1.range_group + 1 = q2.range_group  OR q1.range_group/number.count = q2.range_group);
 
-INSERT INTO yun_connection 
+INSERT INTO yun_connection (geom, c1_id, c2_id)
 SELECT 
-	ST_MakeLine(q1.c_geom, q2.c_geom),
+	ST_MakeLine(q1.c_geom, q2.c_geom) as geom,
 	q1.id as c1_id,
 	q2.id as c2_id
 FROM 
@@ -174,12 +182,11 @@ FROM
 ) as number
 WHERE number.i_id = q1.i_id AND q1.i_id = q2.i_id AND (q1.range_group + 1 = q2.range_group  OR q1.range_group/number.count = q2.range_group);
 
-INSERT INTO yun_connection 
+INSERT INTO yun_connection (geom, c1_id, c2_id)
 SELECT 
-	st_shortestline(q1.s_geom,q2.c_geom),
+	st_shortestline(q1.s_geom,q2.c_geom) as geom,
 	q1.id as c1_id,
-	q2.id as c2_id,
-	st_astext(q1.s_geom) 
+	q2.id as c2_id
 FROM 
 (
 	SELECT cg.*, i.degree_diff
@@ -207,3 +214,8 @@ WHERE number.i_id = q1.i_id
 		);
 
 
+SELECT a.id, b.id
+FROM yun_processed_sidewalks a, yun_processed_sidewalks b
+WHERE ST_Intersects(a.geom, b.geom)
+  AND NOT ST_Relate(a.geom, b.geom, '****0****')
+  AND a.id != b.id
